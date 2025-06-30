@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name            better_pspay
 // @namespace       http://tampermonkey.net/
-// @version         0.7
+// @version         0.8
 // @description     hehе
 // @match           https://p2p-paradise.info/
 // @grant           none
@@ -15,11 +15,23 @@
 (function() {
     'use strict';
 
+    function getExchangeRates() {
+        const xmlHttp = new XMLHttpRequest();
+        xmlHttp.open('GET', 'https://api.coinbase.com/v2/prices/USDT-RUB/spot', false)
+        xmlHttp.send(null);
+        return JSON.parse(xmlHttp.responseText);
+    }
+
     // Функция для форматирования значения страхового баланса
     const formatBalance = (balance) => {
         // Делим на 100 и добавляем знак доллара
         const formattedBalance = (balance / 100).toFixed(2);
         return `$${formattedBalance}`;
+    };
+
+    const convertToRub = (value, rate) => {
+        const formattedBalance = ((value / 100) * rate).toFixed(2);
+        return `${formattedBalance}₽`;
     };
 
     const createDivElement = (name) => {
@@ -85,6 +97,13 @@
         priorityContainer.className = 'chakra-stack css-1meq8zh';
         priorityContainer.innerHTML = `<div class="chakra-stack css-1ubuaci"><div class="chakra-stack css-1ubuaci"><h2 class="chakra-heading css-mhh1m3">${value}</h2><p class="css-1tzeee1">Приоритет</p></div>`;
         return priorityContainer;
+    };
+
+    const createRubBalanceElement = (balance) => {
+        const rubBalanceContainer = document.createElement('div');
+        rubBalanceContainer.className = 'chakra-stack css-1meq8zh';
+        rubBalanceContainer.innerHTML = `<div class="chakra-stack css-1ubuaci"><div class="chakra-stack css-1ubuaci"><h2 class="chakra-heading css-mhh1m3">${balance}</h2><p class="css-1tzeee1">Баланс в RUB</p></div>`;
+        return rubBalanceContainer;
     }
 
 
@@ -97,6 +116,7 @@
                 try {
                     const response = JSON.parse(this.responseText);
                     if (response && response.account) {
+                        const balance = response.account.balance;
                         const insuranceBalance = response.account.insurance_balance;
                         const frozenBalance = response.account.frozen_balance;
                         const failedTrades = response.account.failed_trades_in_row;
@@ -110,11 +130,14 @@
 
                         if (betterElements) {
                             // Создаем и добавляем все элементы
+                            const rates = getExchangeRates().data.amount;
+                            const rubBalanceElement = createRubBalanceElement(convertToRub(balance, rates));
                             const insuranceBalanceElement = createInsuranceBalanceElement(insuranceBalance);
                             const frozenBalanceElement = createFrozenBalanceElement(frozenBalance);
                             const failedTradesElement = createFailedTradesElement(failedTrades);
                             const autoPayoutElement = createAutoPayoutElement(autoPayout);
                             const priorityElement = createPriorityElement(priority);
+                            betterElements.appendChild(rubBalanceElement);
                             betterElements.appendChild(frozenBalanceElement);
                             betterElements.appendChild(insuranceBalanceElement);
                             betterElements.appendChild(failedTradesElement);
