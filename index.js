@@ -188,7 +188,6 @@
                 waitForElm('.css-ypzelf').then((elm) => {
                     const profitElement = document.querySelector('.css-ura6l9')
                     const rate = getExchangeRates().data.amount;
-                    document.querySelector('.css-ura6l9').textContent = convertProfitToRub(profitElement.textContent.replace('$', ''), rate);
                     const rubProfitElement = createRubProfitElement(convertProfitToRub(profitElement.textContent.replace('$', ''), rate))
                     elm.appendChild(rubProfitElement)
                 });
