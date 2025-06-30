@@ -3,7 +3,7 @@
 // @namespace       http://tampermonkey.net/
 // @version         0.8
 // @description     hehе
-// @match           https://p2p-paradise.info/
+// @match           https://p2p-paradise.info/*
 // @grant           none
 // @author          vccuser
 // @license         GPL-3.0-or-later; http://www.gnu.org/licenses/gpl-3.0.txt
@@ -14,6 +14,27 @@
 
 (function() {
     'use strict';
+
+    function waitForElm(selector) {
+        return new Promise(resolve => {
+            if (document.querySelector(selector)) {
+                return resolve(document.querySelector(selector));
+            }
+
+            const observer = new MutationObserver(mutations => {
+                if (document.querySelector(selector)) {
+                    observer.disconnect();
+                    resolve(document.querySelector(selector));
+                }
+            });
+
+            // If you get "parameter 1 is not of type 'Node'" error, see https://stackoverflow.com/a/77855838/492336
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true
+            });
+        });
+    }
 
     function getExchangeRates() {
         const xmlHttp = new XMLHttpRequest();
@@ -29,8 +50,13 @@
         return `$${formattedBalance}`;
     };
 
-    const convertToRub = (value, rate) => {
+    const convertBalanceToRub = (value, rate) => {
         const formattedBalance = ((value / 100) * rate).toFixed(2);
+        return `${formattedBalance}₽`;
+    };
+
+    const convertProfitToRub = (value, rate) => {
+        const formattedBalance = (value * rate).toFixed(2);
         return `${formattedBalance}₽`;
     };
 
@@ -106,6 +132,13 @@
         return rubBalanceContainer;
     }
 
+    const createRubProfitElement = (profitvalue) => {
+        const rubProfitContainer = document.createElement('dl');
+        rubProfitContainer.className = 'chakra-stat__root css-ui23l0';
+        rubProfitContainer.innerHTML = `<div class="chakra-stack css-1y3f6ad"><dt class="chakra-stat__label css-1u8b1zv">Выручка в RUB</dt></div><dd class="chakra-stat__valueText css-ura6l9">${profitvalue}</dd>`
+        return rubProfitContainer;
+    }
+
 
 
     // Перехват XMLHttpRequest
@@ -113,42 +146,55 @@
     XMLHttpRequest.prototype.open = function(method, url) {
         if (method === 'GET' && url === 'https://api.p2p-paradise.info/account' && document.URL === 'https://p2p-paradise.info/') {
             this.addEventListener('load', function() {
-                try {
-                    const response = JSON.parse(this.responseText);
-                    if (response && response.account) {
-                        const balance = response.account.balance;
-                        const insuranceBalance = response.account.insurance_balance;
-                        const frozenBalance = response.account.frozen_balance;
-                        const failedTrades = response.account.failed_trades_in_row;
-                        const autoPayout = response.account.auto_payout_accept;
-                        const priority = response.account.priority;
+                waitForElm('.css-jft3y9').then((elm) => {
+                    try {
+                        const response = JSON.parse(this.responseText);
+                        if (response && response.account) {
+                            const balance = response.account.balance;
+                            const insuranceBalance = response.account.insurance_balance;
+                            const frozenBalance = response.account.frozen_balance;
+                            const failedTrades = response.account.failed_trades_in_row;
+                            const autoPayout = response.account.auto_payout_accept;
+                            const priority = response.account.priority;
 
-                        const infoContainer = document.querySelector('.css-jft3y9');
-                        const divElement = createDivElement('Better PsPay');
-                        infoContainer.appendChild(divElement)
-                        const betterElements = document.querySelector('#better')
+                            const divElement = createDivElement('Better PsPay');
+                            elm.appendChild(divElement)
+                            const betterElements = document.querySelector('#better')
 
-                        if (betterElements) {
-                            // Создаем и добавляем все элементы
-                            const rates = getExchangeRates().data.amount;
-                            const rubBalanceElement = createRubBalanceElement(convertToRub(balance, rates));
-                            const insuranceBalanceElement = createInsuranceBalanceElement(insuranceBalance);
-                            const frozenBalanceElement = createFrozenBalanceElement(frozenBalance);
-                            const failedTradesElement = createFailedTradesElement(failedTrades);
-                            const autoPayoutElement = createAutoPayoutElement(autoPayout);
-                            const priorityElement = createPriorityElement(priority);
-                            betterElements.appendChild(rubBalanceElement);
-                            betterElements.appendChild(frozenBalanceElement);
-                            betterElements.appendChild(insuranceBalanceElement);
-                            betterElements.appendChild(failedTradesElement);
-                            betterElements.appendChild(autoPayoutElement);
-                            betterElements.appendChild(priorityElement);
+                            if (betterElements) {
+                                // Создаем и добавляем все элементы
+                                const rate = getExchangeRates().data.amount;
+                                const rubBalanceElement = createRubBalanceElement(convertBalanceToRub(balance, rate));
+                                const insuranceBalanceElement = createInsuranceBalanceElement(insuranceBalance);
+                                const frozenBalanceElement = createFrozenBalanceElement(frozenBalance);
+                                const failedTradesElement = createFailedTradesElement(failedTrades);
+                                const autoPayoutElement = createAutoPayoutElement(autoPayout);
+                                const priorityElement = createPriorityElement(priority);
+                                betterElements.appendChild(rubBalanceElement);
+                                betterElements.appendChild(frozenBalanceElement);
+                                betterElements.appendChild(insuranceBalanceElement);
+                                betterElements.appendChild(failedTradesElement);
+                                betterElements.appendChild(autoPayoutElement);
+                                betterElements.appendChild(priorityElement);
+                            }
                         }
+                    } catch (e) {
+                        console.error('Ошибка парсинга JSON:', e);
                     }
-                } catch (e) {
-                    console.error('Ошибка парсинга JSON:', e);
-                }
+                })
             });
+        } else if (method === 'GET' && url.includes('https://api.p2p-paradise.info/traders/analytics/payments?start_date') === true && document.URL === 'https://p2p-paradise.info/p2p-trading/analytics') {
+            try {
+                waitForElm('.css-ypzelf').then((elm) => {
+                    const profitElement = document.querySelector('.css-ura6l9')
+                    const rate = getExchangeRates().data.amount;
+                    document.querySelector('.css-ura6l9').textContent = convertProfitToRub(profitElement.textContent.replace('$', ''), rate);
+                    const rubProfitElement = createRubProfitElement(convertProfitToRub(profitElement.textContent.replace('$', ''), rate))
+                    elm.appendChild(rubProfitElement)
+                });
+            } catch (e) {
+                console.error('Ошибка парсинга JSON:', e);
+            }
         }
         originalXhrOpen.apply(this, arguments);
     };
