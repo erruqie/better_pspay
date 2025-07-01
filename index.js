@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name            better_pspay
 // @namespace       http://tampermonkey.net/
-// @version         0.8
+// @version         0.8.1
 // @description     hehе
 // @match           https://p2p-paradise.info/*
 // @grant           none
@@ -28,7 +28,6 @@
                 }
             });
 
-            // If you get "parameter 1 is not of type 'Node'" error, see https://stackoverflow.com/a/77855838/492336
             observer.observe(document.body, {
                 childList: true,
                 subtree: true
@@ -157,12 +156,13 @@
                             const autoPayout = response.account.auto_payout_accept;
                             const priority = response.account.priority;
 
-                            const divElement = createDivElement('Better PsPay');
-                            elm.appendChild(divElement)
-                            const betterElements = document.querySelector('#better')
+                            let betterElements = document.querySelector('#better')
 
-                            if (betterElements) {
+                            if (!betterElements) {
                                 // Создаем и добавляем все элементы
+                                const divElement = createDivElement('Better PsPay');
+                                elm.appendChild(divElement)
+                                betterElements = document.querySelector('#better')
                                 const rate = getExchangeRates().data.amount;
                                 const rubBalanceElement = createRubBalanceElement(convertBalanceToRub(balance, rate));
                                 const insuranceBalanceElement = createInsuranceBalanceElement(insuranceBalance);
